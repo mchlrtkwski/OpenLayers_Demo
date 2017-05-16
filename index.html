@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="ol3/ol.css" type="text/css">
+  <link rel="stylesheet" href="css/main.css" type="text/css">
+  <title>OpenLayers Demo</title>
+  <script src="ol3/ol.js" type="text/javascript"></script>
+  <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Adventure Voyage: Starship Enterprise</h1>
+    <div id = "menu">
+      <input id="address_input" type="text" value="3610 Pentagon Blvd">
+      <input id="city_input" type="text" value="Beavercreek">
+      <select id ="state_input">
+        <option value="AL">Alabama</option>
+        <option value="AK">Alaska</option>
+        <option value="AZ">Arizona</option>
+        <option value="AR">Arkansas</option>
+        <option value="CA">California</option>
+        <option value="CO">Colorado</option>
+        <option value="CT">Connecticut</option>
+        <option value="DE">Delaware</option>
+        <option value="DC">District Of Columbia</option>
+        <option value="FL">Florida</option>
+        <option value="GA">Georgia</option>
+        <option value="HI">Hawaii</option>
+        <option value="ID">Idaho</option>
+        <option value="IL">Illinois</option>
+        <option value="IN">Indiana</option>
+        <option value="IA">Iowa</option>
+        <option value="KS">Kansas</option>
+        <option value="KY">Kentucky</option>
+        <option value="LA">Louisiana</option>
+        <option value="ME">Maine</option>
+        <option value="MD">Maryland</option>
+        <option value="MA">Massachusetts</option>
+        <option value="MI">Michigan</option>
+        <option value="MN">Minnesota</option>
+        <option value="MS">Mississippi</option>
+        <option value="MO">Missouri</option>
+        <option value="MT">Montana</option>
+        <option value="NE">Nebraska</option>
+        <option value="NV">Nevada</option>
+        <option value="NH">New Hampshire</option>
+        <option value="NJ">New Jersey</option>
+        <option value="NM">New Mexico</option>
+        <option value="NY">New York</option>
+        <option value="NC">North Carolina</option>
+        <option value="ND">North Dakota</option>
+        <option value="OH" selected>Ohio</option>
+        <option value="OK">Oklahoma</option>
+        <option value="OR">Oregon</option>
+        <option value="PA">Pennsylvania</option>
+        <option value="RI">Rhode Island</option>
+        <option value="SC">South Carolina</option>
+        <option value="SD">South Dakota</option>
+        <option value="TN">Tennessee</option>
+        <option value="TX">Texas</option>
+        <option value="UT">Utah</option>
+        <option value="VT">Vermont</option>
+        <option value="VA">Virginia</option>
+        <option value="WA">Washington</option>
+        <option value="WV">West Virginia</option>
+        <option value="WI">Wisconsin</option>
+        <option value="WY">Wyoming</option>
+      </select>
+      <button onclick="createMap()">submit</button>
+      <br>
+    </div>
+    <p>Left Arrow:Rotate Left | Right Arrow:Rotate Right | Up Arrow:Move | Space:Shoot</p>
+
+    <br>
+  </header>
+  <div id="map">
+    <img id="ship" src= "./res/ship.png" width=100px>
+    <img id="laser" src= "./res/laser.png " width=30px>
+  </div>
+  <script type="text/javascript">
+  function createMap(){
+
+    //Remove Input From User and Display the Images;
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('ship').style.display = 'block';
+    document.getElementById('laser').style.display = 'block';
+
+    //Concatenate address,city,state and key into a single url;
+    //To-do:Add Error Handeling;
+    var key = "AIzaSyBQv7gQwfOaw_eH0xrRRA_6gL6NmuW-C7Y";
+    var address = document.getElementById("address_input").value;
+    address = address.split(" ").join("+");
+    var city = document.getElementById("city_input").value;
+    city = city.split(" ").join("+");
+    var state = document.getElementById("state_input").value;
+    var parameters = "?address=" + address + "," + city + "," + state + "&key=" + key;
+    var url = "https://maps.googleapis.com/maps/api/geocode/json" + parameters + "&callback";
+
+    //Perform API Call to Recieve longitude and latitude;
+    var json_file;
+    $.getJSON(url, function(data) {
+      json_file = (((data.results)[0])['geometry'])['location'];
+      var lat_coord = json_file['lat'];
+      var lng_coord = json_file['lng'];
+
+      //Store coordinates in city variable;
+      var city = ol.proj.transform([lng_coord, lat_coord], 'EPSG:4326', 'EPSG:3857');
+      var osmLayer = new ol.layer.Tile({source: new ol.source.OSM()});
+
+      //Overlay Ship from center;
+      var ship = new ol.Overlay({
+        element:document.getElementById('ship'),
+        positioning:'center-center'
+      });
+
+      //Overlay Laser from center;
+      var laser = new ol.Overlay({
+        element:document.getElementById('laser'),
+        positioning:'center-center'
+      });
+
+      //Create Map; Remove Zoomability;
+      var view = new ol.View({center: city,zoom: 16});
+      var map = new ol.Map({target: 'map', controls: [], interactions: ol.interaction.defaults({mouseWheelZoom:false})});
+      map.addLayer(osmLayer);
+      map.addOverlay(ship);
+      map.setView(view);
+      ship.setPosition(city);
+
+      //Set Ship Coordinate Values and other
+      var x = lng_coord;
+      var y = lat_coord;
+      var x_mapBounds = lng_coord;
+      var y_mapBounds = lat_coord;
+      var rotation = 0;
+      var x_extreme = .00656;
+      var y_extreme = .00170;
+      var speed_per_press = .00015;
+      var shootTime = 0
+
+      //Key Events
+      document.onkeydown = checkKey;
+      function checkKey(e) {
+        e = e || window.event;
+        // up arrow
+        if (e.keyCode == '38') {
+          //Calculate 2 Dimensional Movement;
+          x = x + (speed_per_press * Math.sin(convertRadians(rotation)));
+          y = y + (speed_per_press * Math.cos(convertRadians(rotation)));
+
+          //If the Ship is nearing the left or right of the map, move the map;
+          if (((x_mapBounds-x) < -x_extreme) || ((x_mapBounds-x) > x_extreme)){
+            x_mapBounds = x_mapBounds + (speed_per_press* Math.sin(convertRadians(rotation)));
+            city = ol.proj.transform([x_mapBounds, y_mapBounds], 'EPSG:4326', 'EPSG:3857');
+            view = new ol.View({center: city,zoom: 16});
+            map.setView(view);
+          }
+          //If the Ship is nearing the top or bottom of the map, move the map;
+          if (((y_mapBounds-y) < -y_extreme) || ((y_mapBounds-y) > y_extreme)){
+            y_mapBounds = y_mapBounds + (speed_per_press * Math.cos(convertRadians(rotation)));
+            city = ol.proj.transform([x_mapBounds, y_mapBounds], 'EPSG:4326', 'EPSG:3857');
+            view = new ol.View({center: city,zoom: 16});
+            map.setView(view);
+          }
+          //Move Ship
+          ship.setPosition(ol.proj.transform([x , y], 'EPSG:4326', 'EPSG:3857'));
+        }
+        // space bar
+        else if (e.keyCode == '32') {
+          // Only Shoot if No shot is currently out;
+          if (shootTime == 0){
+            //Snapshot current rotation and location;
+            var currentRotation = rotation;
+            var laser_x = x;
+            var laser_y = y;
+            map.addOverlay(laser);
+            laser.setPosition(ol.proj.transform([laser_x , laser_y], 'EPSG:4326', 'EPSG:3857'));
+            document.getElementById("laser").style.transform = "rotate(" + currentRotation + "deg)";
+
+            //Play Sound Effect
+            var pew = new Audio('./res/pew.mp3');
+            pew.play();
+
+            //Function moves Laser over time;
+            var fire_function;
+            function shoot_Lasers() {
+              laser_x = laser_x + (speed_per_press * Math.sin(convertRadians(rotation)));
+              laser_y = laser_y + (speed_per_press * Math.cos(convertRadians(rotation)));
+              laser.setPosition(ol.proj.transform([laser_x , laser_y], 'EPSG:4326', 'EPSG:3857'));
+              shootTime = shootTime + 1;
+              // Remove Shot after 75 calls of this function;
+              if (shootTime >75) {
+                shootTime = 0;
+                map.removeOverlay(laser);
+                clearTimeout(fire_function);
+                return false;
+              }
+              fire_function =  setTimeout(shoot_Lasers, 10);
+            }
+            shoot_Lasers();
+          }
+
+        }
+        // left arrow
+        else if (e.keyCode == '37') {
+          rotation = rotation - 9;
+          document.getElementById("ship").style.transform = "rotate(" + rotation + "deg)";
+        }
+        // right arrow
+        else if (e.keyCode == '39') {
+          rotation = rotation + 9;
+          document.getElementById("ship").style.transform = "rotate(" + rotation + "deg)";
+        }
+      }
+    });
+
+    //Quick Conversion for Radians to Perform Geometric Calculations;
+    function convertRadians(degreeValue)
+    {
+      return (degreeValue * (Math.PI/180));
+    }
+
+  }
+  </script>
+</body>
+</html>

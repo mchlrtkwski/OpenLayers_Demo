@@ -1,0 +1,46 @@
+#map {
+  height: 256px;
+  width: 512px;
+}
+header{
+  text-align: center;
+  background-color:black;
+  border-radius: 10px;
+}
+h1{
+  color: white;
+}
+body{
+  position:relative;
+  min-height:100%;
+}
+#map{
+  width:100%;
+  min-height: 100%;
+  position:fixed;
+}
+#ship{
+  display:none;
+}
+#laser{
+  display:none;
+}
+p{
+  color:white;
+  margin-left: auto;
+  margin-right:auto;
+  font-size: 1.1em;
+}
+input{
+  font-size: 1.1em;
+}
+select{
+  font-size: 1.1em;
+}
+button{
+  font-size: 1.1em;
+}
+#menu{
+  text-align: center;
+  font-size: 1.1em;
+}
